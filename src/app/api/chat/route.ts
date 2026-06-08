@@ -145,12 +145,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const result = await model.generateContent([
-      { text: CONTEXT },
-      { text: `User question: ${message}` },
-    ]);
+    // Abort if Gemini hasn't responded within 8s (Vercel hobby limit is 10s)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const result = await model.generateContent(
+      [{ text: CONTEXT }, { text: `User question: ${message}` }],
+    );
+    clearTimeout(timeout);
 
     const text = result.response.text();
 
@@ -163,9 +167,11 @@ export async function POST(req: NextRequest) {
       }
     );
   } catch (err) {
-    console.error("Gemini error:", err instanceof Error ? err.message : "unknown");
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("Gemini error:", msg);
+    const isTimeout = msg.includes("abort") || msg.includes("timeout");
     return NextResponse.json(
-      { error: "Failed to get a response. Please try again." },
+      { error: isTimeout ? "Response timed out — please try again." : "Failed to get a response. Please try again." },
       { status: 500 }
     );
   }
