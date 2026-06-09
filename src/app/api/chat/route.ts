@@ -145,33 +145,36 @@ export async function POST(req: NextRequest) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // Abort if Gemini hasn't responded within 8s (Vercel hobby limit is 10s)
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const generatePromise = model.generateContent([
+      { text: CONTEXT },
+      { text: `User question: ${message}` },
+    ]);
 
-    const result = await model.generateContent(
-      [{ text: CONTEXT }, { text: `User question: ${message}` }],
+    // Race against an 8s timeout (Vercel Hobby cuts at 10s)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 8000)
     );
-    clearTimeout(timeout);
 
+    const result = await Promise.race([generatePromise, timeoutPromise]);
     const text = result.response.text();
 
     return NextResponse.json(
       { response: text },
-      {
-        headers: {
-          "X-RateLimit-Remaining": String(remaining),
-        },
-      }
+      { headers: { "X-RateLimit-Remaining": String(remaining) } }
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown";
     console.error("Gemini error:", msg);
-    const isTimeout = msg.includes("abort") || msg.includes("timeout");
+    if (msg === "timeout") {
+      return NextResponse.json(
+        { error: "Response timed out — please try again." },
+        { status: 504 }
+      );
+    }
     return NextResponse.json(
-      { error: isTimeout ? "Response timed out — please try again." : "Failed to get a response. Please try again." },
+      { error: "Failed to get a response. Please try again." },
       { status: 500 }
     );
   }
