@@ -102,13 +102,22 @@ export default function AskMe() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-      const data = await res.json();
-      const reply = res.ok
+      let res: Response | null = null;
+      let data: { response?: string; error?: string } = {};
+
+      // Auto-retry once on failure
+      for (let attempt = 0; attempt < 2; attempt++) {
+        res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+        data = await res.json();
+        if (res.ok) break;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
+      }
+
+      const reply = res?.ok
         ? (data.response ?? "Sorry, something went wrong.")
         : (data.error ?? "Sorry, something went wrong.");
       setMessages((m) => [...m, { id: idRef.current++, role: "assistant", content: reply }]);

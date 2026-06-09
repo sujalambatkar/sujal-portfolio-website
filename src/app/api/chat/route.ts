@@ -145,16 +145,21 @@ export async function POST(req: NextRequest) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // Pass CONTEXT as systemInstruction — processed once, not re-tokenised each turn
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: CONTEXT,
+      generationConfig: {
+        maxOutputTokens: 600,   // keep responses short → faster
+        temperature: 0.7,
+      },
+    });
 
-    const generatePromise = model.generateContent([
-      { text: CONTEXT },
-      { text: `User question: ${message}` },
-    ]);
+    const generatePromise = model.generateContent(message);
 
-    // Race against an 8s timeout (Vercel Hobby cuts at 10s)
+    // Race against 9s — Vercel Hobby hard-kills at 10s
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 8000)
+      setTimeout(() => reject(new Error("timeout")), 9000)
     );
 
     const result = await Promise.race([generatePromise, timeoutPromise]);
