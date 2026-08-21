@@ -1,6 +1,6 @@
 export const personalInfo = {
   name: "Sujal Ambatkar",
-  tagline: "Full-Stack Backend & Generative AI Engineer",
+  tagline: "Backend and AI Engineer",
   email: "sujal121204@gmail.com",
   bio: "I specialize in Agentic AI systems, LangChain/LangGraph orchestration, and production-grade LLM-powered applications. I've built multi-agent workflows, RAG pipelines, and FastAPI backends — integrating OpenAI, Anthropic, Groq, and Gemini into scalable, secure systems.",
   highlights: [
